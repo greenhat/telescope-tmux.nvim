@@ -123,7 +123,17 @@ end
 pane_contents.file_paths_cmd = function(opts)
     local Path = require("plenary.path")
     local panes = pane_contents.list_panes()
-    local current_pane = utils.get_os_command_output({ "echo", "${TMUX_PANE}" })
+    -- vim.print(vim.inspect(panes))
+    local current_pane = os.getenv("TMUX_PANE") or ""
+    vim.print("current_pane: " .. vim.inspect(current_pane))
+    local current_pane_path = utils.get_os_command_output({
+        "tmux",
+        "display",
+        "-pt",
+        current_pane,
+        "#{pane_current_path}",
+    })[1] or ""
+    vim.print("current_pane_path: " .. current_pane_path)
     local num_history_lines = opts.max_history_lines or 10000
     local grep_cmd = opts.grep_cmd or "grep -oP"
     -- regex to find paths and optional "line:col" at the end
@@ -131,14 +141,17 @@ pane_contents.file_paths_cmd = function(opts)
     local results = {}
     for _, pane in ipairs(panes) do
         local pane_id = pane.id
-        if pane_id ~= current_pane then
-            local pane_path = utils.get_os_command_output({
-                "tmux",
-                "display",
-                "-pt",
-                pane_id,
-                "#{pane_current_path}",
-            })[1] or ""
+        local pane_path = utils.get_os_command_output({
+            "tmux",
+            "display",
+            "-pt",
+            pane_id,
+            "#{pane_current_path}",
+        })[1] or ""
+        -- vim.print("pane_path: " .. pane_path)
+        if pane_id ~= current_pane and pane_path == current_pane_path then
+            vim.print("pane_id: " .. pane_id)
+            vim.print("pane_path: " .. pane_path)
             local command_str = "tmux capture-pane -p -t "
                 .. pane_id
                 .. " -S "
@@ -148,6 +161,7 @@ pane_contents.file_paths_cmd = function(opts)
                 .. " '"
                 .. regex
                 .. "' | tr -d ' '"
+            vim.print("command_str: " .. command_str)
             local contents = utils.get_os_command_output({
                 "sh",
                 "-c",
