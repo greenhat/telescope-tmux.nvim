@@ -125,7 +125,7 @@ pane_contents.file_paths_cmd = function(opts)
     local panes = pane_contents.list_panes()
     -- vim.print(vim.inspect(panes))
     local current_pane = os.getenv("TMUX_PANE") or ""
-    vim.print("current_pane: " .. vim.inspect(current_pane))
+    -- vim.print("current_pane: " .. vim.inspect(current_pane))
     local current_pane_path = utils.get_os_command_output({
         "tmux",
         "display",
@@ -133,11 +133,13 @@ pane_contents.file_paths_cmd = function(opts)
         current_pane,
         "#{pane_current_path}",
     })[1] or ""
-    vim.print("current_pane_path: " .. current_pane_path)
+    -- vim.print("current_pane_path: " .. current_pane_path)
     local num_history_lines = opts.max_history_lines or 10000
     local grep_cmd = opts.grep_cmd or "grep -oP"
     -- regex to find paths and optional "line:col" at the end
-    local regex = opts.regex or "(([.\\w\\-~\\$@]+)(\\/?[\\w\\-@]+)+\\/?)\\.([\\w]+)(:\\d*:\\d*)?"
+    -- local regex = opts.regex or "(([.\\w\\-~\\$@]+)(\\/?[\\w\\-@]+)+\\/?)\\.([\\w]+)(:\\d*:\\d*)?"
+    -- include leading / or .
+    local regex = opts.regex or "(([./]?[.\\w\\-~\\$@]+)(\\/?[\\w\\-@]+)+\\/?)\\.([\\w]+)(:\\d*:\\d*)?"
     local results = {}
     for _, pane in ipairs(panes) do
         local pane_id = pane.id
@@ -150,8 +152,8 @@ pane_contents.file_paths_cmd = function(opts)
         })[1] or ""
         -- vim.print("pane_path: " .. pane_path)
         if pane_id ~= current_pane and pane_path == current_pane_path then
-            vim.print("pane_id: " .. pane_id)
-            vim.print("pane_path: " .. pane_path)
+            -- vim.print("pane_id: " .. pane_id)
+            -- vim.print("pane_path: " .. pane_path)
             local command_str = "tmux capture-pane -p -t "
                 .. pane_id
                 .. " -S "
@@ -161,13 +163,15 @@ pane_contents.file_paths_cmd = function(opts)
                 .. " '"
                 .. regex
                 .. "' | tr -d ' '"
-            vim.print("command_str: " .. command_str)
+            -- vim.print("command_str: " .. command_str)
             local contents = utils.get_os_command_output({
                 "sh",
                 "-c",
                 command_str,
             })
-            for _, line in ipairs(contents) do
+            -- vim.print("contents: " .. vim.inspect(contents))
+            -- vim.print("contents length: " .. #contents)
+            for idx, line in ipairs(contents) do
                 -- parse path, line, col
                 local splits = {}
                 local i = 1
@@ -182,21 +186,38 @@ pane_contents.file_paths_cmd = function(opts)
                 if path:is_file() then
                     local result = { path = path:normalize(), lnum = splits[2], cnum = splits[3] }
                     local key = result.path .. ":" .. (result.lnum or "") .. ":" .. (result.cnum or "")
-                    if results[key] == nil then
-                        results[key] = result
-                    end
+                    -- if results[key] == nil then
+                    results[key] = {
+                        idx = idx,
+                        res = result,
+                    }
+                    -- end
                 end
             end
         end
     end
 
+    -- vim.print("results before sort: " .. vim.inspect(results))
+
+    local res_array = {}
+
+    for _, v in pairs(results) do
+        table.insert(res_array, v)
+    end
+
+    -- sort more recent results first
+    table.sort(res_array, function(a, b)
+        return a.idx > b.idx
+    end)
+    -- vim.print("results after sort: " .. vim.inspect(res_array))
+
     local make_results = function()
         local values = {}
-        for _, v in pairs(results) do
+        for _, v in ipairs(res_array) do
             table.insert(values, {
-                path = v.path,
-                lnum = tonumber(v.lnum),
-                cnum = tonumber(v.cnum),
+                path = v.res.path,
+                lnum = tonumber(v.res.lnum),
+                cnum = tonumber(v.res.cnum),
             })
         end
         return values
