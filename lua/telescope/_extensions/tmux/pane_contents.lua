@@ -139,7 +139,9 @@ pane_contents.file_paths_cmd = function(opts)
     -- regex to find paths and optional "line:col" at the end
     -- local regex = opts.regex or "(([.\\w\\-~\\$@]+)(\\/?[\\w\\-@]+)+\\/?)\\.([\\w]+)(:\\d*:\\d*)?"
     -- include leading / or .
-    local regex = opts.regex or "(([./]?[.\\w\\-~\\$@]+)(\\/?[\\w\\-@]+)+\\/?)\\.([\\w]+)(:\\d*:\\d*)?"
+    -- local regex = opts.regex or "(([./]?[.\\w\\-~\\$@]+)(\\/?[\\w\\-@]+)+\\/?)\\.([\\w]+)(:\\d*(:\\d*)?)?"
+    -- required line:col at the end
+    local regex = opts.regex or "(([./]?[.\\w\\-~\\$@]+)(\\/?[\\w\\-@]+)+\\/?)\\.([\\w]+)(:\\d*(:\\d*)?)?"
     local results = {}
     for _, pane in ipairs(panes) do
         local pane_id = pane.id
@@ -217,7 +219,7 @@ pane_contents.file_paths_cmd = function(opts)
             table.insert(values, {
                 path = v.res.path,
                 lnum = tonumber(v.res.lnum),
-                cnum = tonumber(v.res.cnum),
+                cnum = tonumber(v.res.cnum or 0),
             })
         end
         return values
@@ -230,7 +232,7 @@ pane_contents.file_paths_cmd = function(opts)
                 entry_maker = function(result)
                     local path = result.path
                     local line_num = result.lnum
-                    local col_num = result.cnum
+                    local col_num = result.cnum or 0
                     local line_col = ""
                     if line_num then
                         line_col = ":" .. line_num .. ":" .. col_num
